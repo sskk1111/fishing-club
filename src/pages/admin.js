@@ -9,6 +9,7 @@ const path = require('path');
 const multer = require('multer');
 const db = require('../db');
 const H = require('../helpers');
+const guard = require('../login-guard');
 
 const router = express.Router();
 const PUBLIC_DIR = path.join(__dirname, '..', '..', 'public');
@@ -122,6 +123,15 @@ function loginAdminPage(msg) {
 router.post('/login_admin.php', (req, res) => {
   const username = H.str(req.body.username);
   const password = H.str(req.body.password);
+  const ip = guard.clientIp(req);
+
+  /* 防暴力破解：同一来源在窗口内失败达上限即锁定，锁定期间不再校验密码。
+     先判锁定再判账号，避免通过响应差异探测账号是否存在。 */
+  const gate = guard.check('admin', ip);
+  if (gate.locked) {
+    console.warn('[login-guard] 后台登录已锁定：ip=' + ip + '，剩余 ' + gate.retryAfterMin + ' 分钟');
+    return res.type('html').send(loginAdminPage(`登录失败次数过多，请 ${gate.retryAfterMin} 分钟后再试`));
+  }
 
   if (!username || !password) {
     return res.type('html').send(loginAdminPage('账号和密码不能为空'));
@@ -129,10 +139,18 @@ router.post('/login_admin.php', (req, res) => {
 
   const admin = db.get('SELECT * FROM admin WHERE username = ?', username);
   if (admin && H.verifyPassword(password, admin.password)) {
+    guard.onSuccess('admin', ip);
     req.session.admin_login = true;
     req.session.admin_id = admin.id;
     req.session.admin_name = admin.nickname;
     return res.redirect('admin_index.php');
+  }
+  const fail = guard.onFail('admin', ip);
+  console.warn('[login-guard] 后台登录失败：ip=' + ip + '，账号=' + username + '，累计 ' + fail.count + ' 次');
+  if (fail.locked) {
+    return res
+      .type('html')
+      .send(loginAdminPage(`登录失败次数过多，请 ${Math.ceil(guard.LOCK_MS / 60000)} 分钟后再试`));
   }
   res.type('html').send(loginAdminPage('账号或密码错误'));
 });

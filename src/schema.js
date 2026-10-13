@@ -9,8 +9,14 @@
  *   - contact_msg 合并 user.php 与 contact.php 两套字段
  *   - orders 补齐 admin_book.php 需要的 book_id / money
  *
- * 注意：本文件用于公开仓库，账号相关数据已脱敏 —— 用户名改为 diaoyou01~06，
- * 密码哈希重新加盐生成，手机号/住址等个人信息已清除。后台账号为 admin / 123456。
+ * 注意：本文件用于公开仓库。
+ *  - 钓友账号已脱敏：用户名统一为 diaoyou01~06，密码哈希重新加盐生成，
+ *    手机号/住址等个人信息已清除。
+ *  - 后台账号为 admin / 123456（仅演示用），密码同样以 bcrypt 加盐存储，
+ *    不再使用原库中可秒破的 MD5。code 里仍保留对历史 MD5 的兼容校验，
+ *    便于已有部署平滑迁移。
+ *
+ * 另新增 login_attempt 表，用于后台登录失败次数限制（防暴力破解）。
  */
 
 const SCHEMA = `
@@ -135,11 +141,22 @@ CREATE TABLE IF NOT EXISTS sessions (
   data TEXT NOT NULL,
   expires INTEGER NOT NULL
 );
+
+CREATE TABLE IF NOT EXISTS login_attempt (
+  scope TEXT NOT NULL,
+  ip TEXT NOT NULL,
+  fail_count INTEGER NOT NULL DEFAULT 0,
+  last_fail INTEGER NOT NULL DEFAULT 0,
+  lock_until INTEGER NOT NULL DEFAULT 0,
+  PRIMARY KEY (scope, ip)
+);
 `;
 
 const SEED = {
+  // 后台演示账号：admin / 123456。存 bcrypt 加盐哈希（$2y$ 前缀，对齐 PHP password_hash），
+  // 不再沿用原库的 MD5 —— 无盐 MD5 在公开仓库里等于直接公开明文。
   admin: [
-    [1, 'admin', 'e10adc3949ba59abbe56e057f20f883e', '超级管理员', '2026-06-15 14:45:49'],
+    [1, 'admin', '$2y$10$2SLyD52Uu.mHHQK1lgSkB.e9aRfLUZV9ovbDzZYKtjQFUQVd9H7FO', '超级管理员', '2026-06-15 14:45:49'],
   ],
   // 演示账号：已脱敏。用户名统一为 diaoyou01~06，密码统一 123456；
   // 密码哈希为重新加盐生成，与任何真实账号无关联。
