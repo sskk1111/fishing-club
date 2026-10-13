@@ -1,0 +1,22 @@
+{
+  "name": "fishing-site",
+  "version": "1.0.0",
+  "private": true,
+  "description": "钓鱼乐园 - Node.js + SQLite 版（由 PHP 版迁移）",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js"
+  },
+  "dependencies": {
+    "bcryptjs": "^2.4.3",
+    "express": "^4.19.2",
+    "express-session": "^1.18.0",
+    "multer": "^2.0.2"
+  },
+  "optionalDependencies": {
+    "better-sqlite3": "^11.5.0"
+  },
+  "engines": {
+    "node": ">=18"
+  }
+}
